@@ -28,6 +28,7 @@
 @implementation PushPlugin
 
 @synthesize notificationMessage;
+@synthesize isInline;
 
 @synthesize callbackId;
 @synthesize notificationCallbackId;
@@ -55,14 +56,32 @@
 	self.callbackId = [arguments pop];
 
     UIRemoteNotificationType notificationTypes = UIRemoteNotificationTypeNone;
+    id badgeArg = [options objectForKey:@"badge"];
+    id soundArg = [options objectForKey:@"sound"];
+    id alertArg = [options objectForKey:@"alert"];
     
-    if ([[options objectForKey:@"badge"] isEqualToString:@"true"])
+    if ([badgeArg isKindOfClass:[NSString class]])
+    {
+        if ([badgeArg isEqualToString:@"true"])
+            notificationTypes |= UIRemoteNotificationTypeBadge;
+    }
+    else if ([badgeArg boolValue])
         notificationTypes |= UIRemoteNotificationTypeBadge;
-
-    if ([[options objectForKey:@"sound"] isEqualToString:@"true"])
+    
+    if ([soundArg isKindOfClass:[NSString class]])
+    {
+        if ([soundArg isEqualToString:@"true"])
+            notificationTypes |= UIRemoteNotificationTypeSound;
+    }
+    else if ([soundArg boolValue])
         notificationTypes |= UIRemoteNotificationTypeSound;
-
-    if ([[options objectForKey:@"alert"] isEqualToString:@"true"])
+    
+    if ([alertArg isKindOfClass:[NSString class]])
+    {
+        if ([alertArg isEqualToString:@"true"])
+            notificationTypes |= UIRemoteNotificationTypeAlert;
+    }
+    else if ([alertArg boolValue])
         notificationTypes |= UIRemoteNotificationTypeAlert;
     
     self.callback = [options objectForKey:@"ecb"];
@@ -70,7 +89,12 @@
     if (notificationTypes == UIRemoteNotificationTypeNone)
         NSLog(@"PushPlugin.register: Push notification type is set to none");
 
+    isInline = NO;
+
     [[UIApplication sharedApplication] registerForRemoteNotificationTypes:notificationTypes];
+	
+	if (notificationMessage)			// if there is a pending startup notification
+		[self notificationReceived];	// go ahead and process it
 }
 
 - (void)isEnabled:(NSMutableArray *)arguments withDict:(NSMutableDictionary *)options {
@@ -135,9 +159,8 @@
         [results setValue:pushAlert forKey:@"pushAlert"];
         [results setValue:pushSound forKey:@"pushSound"];
 
-        // Get the users Device Model, Display Name, Unique ID, Token & Version Number
+        // Get the users Device Model, Display Name, Token & Version Number
         UIDevice *dev = [UIDevice currentDevice];
-        [results setValue:dev.uniqueIdentifier forKey:@"deviceUuid"];
         [results setValue:dev.name forKey:@"deviceName"];
         [results setValue:dev.model forKey:@"deviceModel"];
         [results setValue:dev.systemVersion forKey:@"deviceSystemVersion"];
@@ -153,25 +176,46 @@
 
 - (void)notificationReceived {
     NSLog(@"Notification received");
-    NSLog(@"Msg: %@", [notificationMessage descriptionWithLocale:[NSLocale currentLocale] indent:4]);
 
-    if (notificationMessage) {
+    if (notificationMessage && self.callback)
+    {
         NSMutableString *jsonStr = [NSMutableString stringWithString:@"{"];
-        if ([notificationMessage objectForKey:@"alert"])
-            [jsonStr appendFormat:@"alert:'%@',", [[notificationMessage objectForKey:@"alert"] stringByReplacingOccurrencesOfString:@"'" withString:@"\\'"]];
 
-        if ([notificationMessage objectForKey:@"badge"])
-            [jsonStr appendFormat:@"badge:%d,", [[notificationMessage objectForKey:@"badge"] intValue]];
+        [self parseDictionary:notificationMessage intoJSON:jsonStr];
 
-        if ([notificationMessage objectForKey:@"sound"])
-            [jsonStr appendFormat:@"sound:'%@',", [notificationMessage objectForKey:@"sound"]];
-
+        if (isInline)
+        {
+            [jsonStr appendFormat:@"foreground:'%d',", 1];
+            isInline = NO;
+        }
+		else
+            [jsonStr appendFormat:@"foreground:'%d',", 0];
+        
         [jsonStr appendString:@"}"];
+
+        NSLog(@"Msg: %@", jsonStr);
 
         NSString * jsCallBack = [NSString stringWithFormat:@"%@(%@);", self.callback, jsonStr];
         [self.webView stringByEvaluatingJavaScriptFromString:jsCallBack];
         
         self.notificationMessage = nil;
+    }
+}
+
+// reentrant method to drill down and surface all sub-dictionaries' key/value pairs into the top level json
+-(void)parseDictionary:(NSDictionary *)inDictionary intoJSON:(NSMutableString *)jsonString
+{
+    NSArray         *keys = [inDictionary allKeys];
+    NSString        *key;
+    
+    for (key in keys)
+    {
+        id thisObject = [inDictionary objectForKey:key];
+    
+        if ([thisObject isKindOfClass:[NSDictionary class]])
+            [self parseDictionary:thisObject intoJSON:jsonString];
+        else
+            [jsonString appendFormat:@"%@:'%@',", key, [inDictionary objectForKey:key]];
     }
 }
 
