@@ -25,7 +25,7 @@ import com.google.android.gcm.GCMBaseIntentService;
 
 @SuppressLint("NewApi")
 public class GCMIntentService extends GCMBaseIntentService {
-
+	
 	public static final int NOTIFICATION_ID = 237;
 	private static final String TAG = "GCMIntentService";
 	
@@ -72,24 +72,28 @@ public class GCMIntentService extends GCMBaseIntentService {
 		Bundle extras = intent.getExtras();
 		if (extras != null)
 		{
-			
+
 			String cancelNotificationString = extras.getString("cancelNotification");
 
 			if (cancelNotificationString != null) 
 		{
-			
+
+			Integer CurrentNotificationID=null;
 			String notIdOnMessage = extras.getString("notId");
 				if (notIdOnMessage != null) {
-				NOTIFICATION_ID = Integer.parseInt(extras.getString("notId"));
+					CurrentNotificationID = Integer.parseInt(extras.getString("notId"));
 				}
-			
+				else {
+					CurrentNotificationID=NOTIFICATION_ID;
+				}
+
 			NotificationManager mNotificationManagerCancel = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-			mNotificationManagerCancel.cancel((String)getAppName(context), NOTIFICATION_ID);	
+			mNotificationManagerCancel.cancel((String)getAppName(context), CurrentNotificationID);	
 		}
-			
+
 			else
 			{
-			
+
 			// if we are in the foreground, just surface the payload, else post it to the statusbar
             if (PushPlugin.isInForeground()) {
 				extras.putBoolean("foreground", true);
@@ -106,7 +110,7 @@ public class GCMIntentService extends GCMBaseIntentService {
 			}
             }
         }
-}
+	}
 
 	public void createNotification(Context context, Bundle extras)
 	{
@@ -118,6 +122,8 @@ public class GCMIntentService extends GCMBaseIntentService {
 		notificationIntent.putExtra("pushBundle", extras);
 
 		PendingIntent contentIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+		
+		
 		
 		
 		Bitmap myBitmap = null;
@@ -161,6 +167,15 @@ public class GCMIntentService extends GCMBaseIntentService {
 			mBuilder.setNumber(Integer.parseInt(msgcnt));
 		}
 		
+		String messageBig = extras.getString("messageBig");
+		if (msgcnt != null) {
+			mBuilder.setStyle(new NotificationCompat.BigTextStyle()
+			 .bigText(messageBig));
+		}
+		
+		
+       
+		
 		int notId = 0;
 		
 		try {
@@ -173,9 +188,20 @@ public class GCMIntentService extends GCMBaseIntentService {
 			Log.e(TAG, "Number format exception - Error parsing Notification ID" + e.getMessage());
 		}
 		
-		mNotificationManager.notify((String) appName, notId, mBuilder.build());
+		
+		Notification notification = mBuilder.build();
+		notification.defaults |= Notification.DEFAULT_VIBRATE;
+        notification.defaults |= Notification.DEFAULT_SOUND;
+        
+        notification.tickerText = extras.getString("title") + "\n" + messageBig;
+		
+		
+		mNotificationManager.notify((String) appName, notId, notification);
 		
 	}
+	
+	
+	
 	
 	private static String getAppName(Context context)
 	{
