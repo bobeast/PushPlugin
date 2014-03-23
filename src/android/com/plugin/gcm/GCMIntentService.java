@@ -26,6 +26,7 @@ import com.google.android.gcm.GCMBaseIntentService;
 @SuppressLint("NewApi")
 public class GCMIntentService extends GCMBaseIntentService {
 
+	public static final int NOTIFICATION_ID = 237;
 	private static final String TAG = "GCMIntentService";
 	
 	public GCMIntentService() {
@@ -71,6 +72,24 @@ public class GCMIntentService extends GCMBaseIntentService {
 		Bundle extras = intent.getExtras();
 		if (extras != null)
 		{
+			
+			String cancelNotificationString = extras.getString("cancelNotification");
+
+			if (cancelNotificationString != null) 
+		{
+			
+			String notIdOnMessage = extras.getString("notId");
+				if (notIdOnMessage != null) {
+				NOTIFICATION_ID = Integer.parseInt(extras.getString("notId"));
+				}
+			
+			NotificationManager mNotificationManagerCancel = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+			mNotificationManagerCancel.cancel((String)getAppName(context), NOTIFICATION_ID);	
+		}
+			
+			else
+			{
+			
 			// if we are in the foreground, just surface the payload, else post it to the statusbar
             if (PushPlugin.isInForeground()) {
 				extras.putBoolean("foreground", true);
@@ -83,9 +102,11 @@ public class GCMIntentService extends GCMBaseIntentService {
                 if (extras.getString("message") != null && extras.getString("message").length() != 0) {
                     createNotification(context, extras);
                 }
+                
+			}
             }
         }
-	}
+}
 
 	public void createNotification(Context context, Bundle extras)
 	{
