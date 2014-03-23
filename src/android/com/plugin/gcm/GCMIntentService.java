@@ -1,27 +1,31 @@
 package com.plugin.gcm;
 
-import java.util.List;
 
-import com.google.android.gcm.GCMBaseIntentService;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import android.annotation.SuppressLint;
-import android.app.ActivityManager;
-import android.app.ActivityManager.RunningTaskInfo;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
+import com.google.android.gcm.GCMBaseIntentService;
+
 @SuppressLint("NewApi")
 public class GCMIntentService extends GCMBaseIntentService {
 
-	public static final int NOTIFICATION_ID = 237;
 	private static final String TAG = "GCMIntentService";
 	
 	public GCMIntentService() {
@@ -94,14 +98,35 @@ public class GCMIntentService extends GCMBaseIntentService {
 
 		PendingIntent contentIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 		
+		
+		Bitmap myBitmap = null;
+		String customIconUrl= null;
+		customIconUrl=extras.getString("icon");
+		
+		  try {
+		        URL url = new URL(customIconUrl);
+		        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+		        connection.setDoInput(true);
+		        connection.connect();
+		        InputStream input = connection.getInputStream();
+		        myBitmap = BitmapFactory.decodeStream(input);
+		      
+		    } catch (IOException e) {
+		        e.printStackTrace();
+		      
+		    }
+		
+		
 		NotificationCompat.Builder mBuilder =
 			new NotificationCompat.Builder(context)
 				.setDefaults(Notification.DEFAULT_ALL)
 				.setSmallIcon(context.getApplicationInfo().icon)
+				.setLargeIcon(myBitmap)
 				.setWhen(System.currentTimeMillis())
 				.setContentTitle(extras.getString("title"))
 				.setTicker(extras.getString("title"))
-				.setContentIntent(contentIntent);
+				.setContentIntent(contentIntent)
+				.setAutoCancel(true);
 
 		String message = extras.getString("message");
 		if (message != null) {
@@ -115,13 +140,20 @@ public class GCMIntentService extends GCMBaseIntentService {
 			mBuilder.setNumber(Integer.parseInt(msgcnt));
 		}
 		
-		mNotificationManager.notify((String) appName, NOTIFICATION_ID, mBuilder.build());
-	}
-	
-	public static void cancelNotification(Context context)
-	{
-		NotificationManager mNotificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-		mNotificationManager.cancel((String)getAppName(context), NOTIFICATION_ID);	
+		int notId = 0;
+		
+		try {
+			notId = Integer.parseInt(extras.getString("notId"));
+		}
+		catch(NumberFormatException e) {
+			Log.e(TAG, "Number format exception - Error parsing Notification ID: " + e.getMessage());
+		}
+		catch(Exception e) {
+			Log.e(TAG, "Number format exception - Error parsing Notification ID" + e.getMessage());
+		}
+		
+		mNotificationManager.notify((String) appName, notId, mBuilder.build());
+		
 	}
 	
 	private static String getAppName(Context context)
